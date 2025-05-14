@@ -1,8 +1,11 @@
 package com.digitalwallet.dto;
 
-public class CardRequestDTO {
+import jakarta.validation.constraints.Min;
 
+public class CardRequestDTO {
+    @Min(value = 1, message = "Quantity must be at least 1")
     private int quantity;
+    @Min(value = 1000, message = "Value must be at least 1000")
     private int value;
 
     public int getQuantity() {
