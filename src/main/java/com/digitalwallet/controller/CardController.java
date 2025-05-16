@@ -18,8 +18,11 @@ public class CardController {
 
     private static final Logger log = LoggerFactory.getLogger(CardController.class);
 
-    @Autowired
-    private CardService cardService;
+    private final CardService cardService;
+
+    public CardController(CardService fileService) {
+        this.cardService = fileService;
+    }
 
     @PostMapping("/batch")
     public ResponseEntity<List<CardResponseDTO>> createCardBatch(@RequestBody @Valid CardRequestDTO request) {
