@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -23,13 +24,15 @@ public class FileServiceTest {
 
     private FileRepository fileRepository;
     private CardRepository cardRepository;
+    private PdfGeneratorService pdfGeneratorService;
     private FileService fileService;
 
     @BeforeEach
     void setUp() {
         fileRepository = mock(FileRepository.class);
         cardRepository = mock(CardRepository.class);
-        fileService = new FileService(fileRepository, cardRepository);
+        pdfGeneratorService = mock(PdfGeneratorService.class);
+        fileService = new FileService(fileRepository, cardRepository,pdfGeneratorService);
     }
 
     @Test
@@ -93,6 +96,39 @@ public class FileServiceTest {
         );
 
         assertTrue(exception.getMessage().equals("Please generate 5 more cards with value 5000"));
+    }
+
+    @Test
+    void generateFilePdf_ShouldReturnPdfBytes_WhenFileExists() {
+        Long fileId = 4L;
+
+        File file = new File();
+        file.setId(fileId);
+
+        List<Card> cards = List.of(
+                new Card(), new Card(), new Card()
+        );
+
+        when(fileRepository.findById(fileId)).thenReturn(Optional.of(file));
+        when(cardRepository.findByBatch(file)).thenReturn(cards);
+        when(pdfGeneratorService.generateCardListPdf(cards)).thenReturn("fake-pdf".getBytes());
+
+        byte[] result = fileService.generateFilePdf(fileId);
+
+        assertNotNull(result);
+        assertEquals("fake-pdf", new String(result));
+    }
+
+    @Test
+    void generateFilePdf_ShouldThrowException_WhenFileNotFound() {
+        Long fileId = 100L;
+        when(fileRepository.findById(fileId)).thenReturn(Optional.empty());
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            fileService.generateFilePdf(fileId);
+        });
+
+        assertEquals("File not found", exception.getMessage());
     }
 
 }

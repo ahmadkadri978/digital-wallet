@@ -22,10 +22,12 @@ public class FileService {
 
     private final FileRepository fileRepository;
     private final CardRepository cardRepository;
+    private final PdfGeneratorService pdfGeneratorService;
 
-    public FileService(FileRepository fileRepository, CardRepository cardRepository) {
+    public FileService(FileRepository fileRepository, CardRepository cardRepository, PdfGeneratorService pdfGeneratorService) {
         this.fileRepository = fileRepository;
         this.cardRepository = cardRepository;
+        this.pdfGeneratorService = pdfGeneratorService;
     }
 
     public FileResponseDTO createFile(FileRequestDTO request, Long userId) {
@@ -62,6 +64,21 @@ public class FileService {
         log.info("Associated {} cards with File ID {}", selectedCards.size(), savedFile.getId());
 
         return convertToDTOList(savedFile);
+    }
+
+    public byte[] generateFilePdf(Long fileId) {
+        log.info("Received request to generate PDF for file ID {}", fileId);
+
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+
+        List<Card> cards = cardRepository.findByBatch(file);
+        file.setStatus(FileStatus.PRINTED);
+        fileRepository.save(file);
+
+        log.info("Generating PDF for {} cards linked to file ID {}", cards.size(), file.getId());
+
+        return pdfGeneratorService.generateCardListPdf(cards);
     }
 
     private FileResponseDTO convertToDTOList(File file) {

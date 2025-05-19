@@ -15,7 +15,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -86,5 +88,24 @@ public class FileControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Please generate 5 more cards with value 5000"));
+    }
+
+    @Test
+    void shouldDownloadPdfSuccessfully() throws Exception {
+        byte[] fakePdf = "fake-pdf-content".getBytes();
+        when(fileService.generateFilePdf(1L)).thenReturn(fakePdf);
+
+        mockMvc.perform(get("/api/files/1/download"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+    }
+
+    @Test
+    void shouldReturn400_WhenFileNotFound() throws Exception {
+        when(fileService.generateFilePdf(anyLong())).thenThrow(new IllegalArgumentException("File not found"));
+
+        mockMvc.perform(get("/api/files/100/download"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("File not found"));
     }
 }
