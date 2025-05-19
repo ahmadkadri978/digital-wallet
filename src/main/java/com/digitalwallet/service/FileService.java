@@ -33,9 +33,15 @@ public class FileService {
 
         List<Card> availableCards = cardRepository.findByBatchIsNullAndValue(request.getValue());
 
+//        if (availableCards.size() < request.getQuantity()) {
+//            throw new IllegalArgumentException("Not enough cards available for the requested value");
+//        }
         if (availableCards.size() < request.getQuantity()) {
-            throw new IllegalArgumentException("Not enough cards available for the requested value");
+            int needed = request.getQuantity() - availableCards.size();
+            String message = String.format("Please generate %d more cards with value %d", needed, request.getValue());
+            throw new IllegalArgumentException(message);
         }
+
         File file = new File();
         file.setType(request.getType());
         file.setStatus(FileStatus.PENDING);
@@ -43,7 +49,6 @@ public class FileService {
         User user = new User();
         user.setId(userId);
         file.setCreatedBy(user);
-
         file.setCreatedAt(LocalDateTime.now());
 
         File savedFile = fileRepository.save(file);
