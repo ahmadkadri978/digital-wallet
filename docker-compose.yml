@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: mysql-digital-wallet
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 30stmars
+      MYSQL_DATABASE: digital_wallet
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

@@ -2,7 +2,9 @@ package com.digitalwallet.service;
 
 import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
+import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.*;
+import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
 import com.digitalwallet.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,14 +22,17 @@ public class CardServiceTest {
     private CardRepository cardRepository;
     private UserRepository userRepository;
     private CardService cardService;
+    private CardMapper cardMapper;
 
     @BeforeEach
-    void setUp(){
+    void setUp() {
         cardRepository = mock(CardRepository.class);
         userRepository = mock(UserRepository.class);
-        cardService = new CardService(cardRepository, userRepository);
-        cardService = spy(new CardService(cardRepository,userRepository));
+        cardMapper = mock(CardMapper.class);
+
+        cardService = spy(new CardService(cardRepository, userRepository, cardMapper));
     }
+
 
     @Test
     void createCardBatch_ShouldCreateCorrectNumberOfCards() {
@@ -198,6 +203,54 @@ public class CardServiceTest {
     }
 
 
+    @Test
+    void getAllCards_shouldReturnMappedDTOs() {
+
+        // Arrange
+        Card card1 = new Card();
+        card1.setId(1L);
+        card1.setCode("CARD001");
+        card1.setValue(100);
+        card1.setStatus(CardStatus.valueOf("PENDING"));
+
+        Card card2 = new Card();
+        card2.setId(2L);
+        card2.setCode("CARD002");
+        card2.setValue(200);
+        card2.setStatus(CardStatus.valueOf("USED"));
+
+
+        List<Card> cardEntities = List.of(card1, card2);
+
+        CardResponseDTO dto1 = new CardResponseDTO();
+        dto1.setId(1L);
+        dto1.setCode("CARD001");
+        dto1.setValue(100);
+        dto1.setStatus(CardStatus.valueOf("PENDING"));
+
+        CardResponseDTO dto2 = new CardResponseDTO();
+        dto2.setId(2L);
+        dto2.setCode("CARD002");
+        dto2.setValue(200);
+        dto2.setStatus(CardStatus.valueOf("USED"));
+
+        when(cardRepository.findAll()).thenReturn(cardEntities);
+        when(cardMapper.toResponseDTO(card1)).thenReturn(dto1);
+        when(cardMapper.toResponseDTO(card2)).thenReturn(dto2);
+
+        // Act
+        List<CardResponseDTO> result = cardService.getAllCards();
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertEquals("CARD001", result.get(0).getCode());
+        assertEquals("CARD002", result.get(1).getCode());
+
+        verify(cardRepository, times(1)).findAll();
+        verify(cardMapper, times(1)).toResponseDTO(card1);
+        verify(cardMapper, times(1)).toResponseDTO(card2);
+    }
 
 
 

@@ -4,6 +4,7 @@ import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.*;
+import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
 import com.digitalwallet.repository.UserRepository;
 import com.google.zxing.BarcodeFormat;
@@ -29,11 +30,16 @@ public class CardService {
     private static final Logger log = LoggerFactory.getLogger(CardService.class);
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
+    private final CardMapper cardMapper;
 
-    public CardService(CardRepository cardRepository, UserRepository userRepository) {
+    public CardService(CardRepository cardRepository, UserRepository userRepository,CardMapper cardMapper) {
         this.cardRepository = cardRepository;
         this.userRepository = userRepository;
+        this.cardMapper = cardMapper;
+
     }
+
+
 
     public List<CardResponseDTO> createCardBatch(CardRequestDTO request) {
 
@@ -102,6 +108,15 @@ public class CardService {
 
         return cards.size();
     }
+
+    public List<CardResponseDTO> getAllCards() {
+        List<Card> cards = cardRepository.findAll();
+        return cards.stream()
+                .map(cardMapper::toResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+
 
     protected String generateUniqueCode() {
         // we can improve it later

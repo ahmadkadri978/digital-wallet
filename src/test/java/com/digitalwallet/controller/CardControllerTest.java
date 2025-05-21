@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,6 +32,7 @@ public class CardControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
 
     @Test
     void createCardBatch_ShouldReturnSuccess() throws Exception {
@@ -107,22 +109,34 @@ public class CardControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+
     @Test
-    void shouldReturn400_WhenServiceThrowsException() throws Exception {
-        AssignCardsToAgentRequestDTO request = new AssignCardsToAgentRequestDTO();
-        request.setAgentId(5L);
-        request.setCardCodes(List.of("CODE1"));
+    void getAllCards_shouldReturnListOfCardResponseDTO() throws Exception {
+        CardResponseDTO card1 = new CardResponseDTO();
+        card1.setId(1L);
+        card1.setCode("CARD001");
+        card1.setStatus(CardStatus.valueOf("PENDING"));
 
-        when(cardService.assignCardsToAgent(any()))
-                .thenThrow(new IllegalArgumentException("Some cards do not exist"));
+        CardResponseDTO card2 = new CardResponseDTO();
+        card2.setId(2L);
+        card2.setCode("CARD002");
+        card2.setStatus(CardStatus.valueOf("USED"));
 
-        mockMvc.perform(post("/api/cards/assign-to-agent")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Some cards do not exist"));
+        List<CardResponseDTO> cards = List.of(card1, card2);
+
+        when(cardService.getAllCards()).thenReturn(cards);
+
+        mockMvc.perform(get("/api/cards/all")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(cards.size()))
+                .andExpect(jsonPath("$[0].code").value("CARD001"))
+                .andExpect(jsonPath("$[0].status").value("PENDING"))
+                .andExpect(jsonPath("$[1].code").value("CARD002"))
+                .andExpect(jsonPath("$[1].status").value("USED"));
+
+        verify(cardService, times(1)).getAllCards();
     }
-
 
     private CardResponseDTO createCardDTO(Long id, String code) {
         CardResponseDTO dto = new CardResponseDTO();

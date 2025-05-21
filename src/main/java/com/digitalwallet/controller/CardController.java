@@ -41,5 +41,14 @@ public class CardController {
 
         return ResponseEntity.ok(count + " cards successfully assigned to agent ID " + request.getAgentId());
     }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<CardResponseDTO>> getAllCards() {
+        log.info("Fetching all cards");
+        List<CardResponseDTO> cards = cardService.getAllCards();
+        return ResponseEntity.ok(cards);
+    }
+
+
 }
 
