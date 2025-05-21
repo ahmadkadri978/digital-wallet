@@ -31,10 +31,14 @@ public class Card {
 
     private LocalDateTime createdAt;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String qrImageBase64;
+
+
     public Card() {
     }
 
-    public Card(String code, Integer value, CardStatus status, boolean isUsed, User assignedTo, File batch, LocalDateTime createdAt) {
+    public Card(String code, Integer value, CardStatus status, boolean isUsed, User assignedTo, File batch, LocalDateTime createdAt, String qrImageBase64) {
         this.code = code;
         this.value = value;
         this.status = status;
@@ -42,6 +46,7 @@ public class Card {
         this.assignedTo = assignedTo;
         this.batch = batch;
         this.createdAt = createdAt;
+        this.qrImageBase64 = qrImageBase64;
     }
 
     public Long getId() {
@@ -106,5 +111,13 @@ public class Card {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getQrImageBase64() {
+        return qrImageBase64;
+    }
+
+    public void setQrImageBase64(String qrImageBase64) {
+        this.qrImageBase64 = qrImageBase64;
     }
 }

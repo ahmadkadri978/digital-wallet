@@ -5,14 +5,18 @@ import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.Card;
 import com.digitalwallet.entity.CardStatus;
 import com.digitalwallet.repository.CardRepository;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -44,6 +48,8 @@ public class CardService {
                     card.setStatus(CardStatus.PENDING);
                     card.setUsed(false);
                     card.setCreatedAt(LocalDateTime.now());
+                    card.setQrImageBase64(generateQrBase64(card.getCode()));
+
                     return card;
                 })
                 .collect(Collectors.toList());
@@ -61,6 +67,33 @@ public class CardService {
         log.debug("Generated code: {}", code);
         return code;
     }
+
+    private String generateQrBase64(String content) {
+        try {
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            Hashtable<EncodeHintType, Object> hints = new Hashtable<>();
+            hints.put(EncodeHintType.MARGIN, 1);
+
+            BitMatrix bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, 200, 200, hints);
+
+            BufferedImage image = new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
+            for (int x = 0; x < 200; x++) {
+                for (int y = 0; y < 200; y++) {
+                    int grayValue = (bitMatrix.get(x, y) ? 0 : 255);
+                    image.setRGB(x, y, (grayValue << 16) | (grayValue << 8) | grayValue);
+                }
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", outputStream);
+
+            return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate QR Code", e);
+        }
+    }
+
 
     private List<CardResponseDTO> convertToDTOList(List<Card> cards) {
         return cards.stream().map(card -> {
