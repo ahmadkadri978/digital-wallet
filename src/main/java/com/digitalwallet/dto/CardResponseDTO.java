@@ -12,6 +12,8 @@ public class CardResponseDTO {
     private boolean used;
     private LocalDateTime createdAt;
 
+    private String qrImageBase64;
+
     public Long getId() {
         return id;
     }
@@ -58,6 +60,14 @@ public class CardResponseDTO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getQrImageBase64() {
+        return qrImageBase64;
+    }
+
+    public void setQrImageBase64(String qrImageBase64) {
+        this.qrImageBase64 = qrImageBase64;
     }
 }
 

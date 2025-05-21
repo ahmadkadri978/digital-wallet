@@ -1,14 +1,16 @@
 package com.digitalwallet.service;
 
+import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
-import com.digitalwallet.entity.Card;
-import com.digitalwallet.entity.CardStatus;
+import com.digitalwallet.entity.*;
 import com.digitalwallet.repository.CardRepository;
+import com.digitalwallet.repository.UserRepository;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
+import jakarta.transaction.Transactional;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 import org.springframework.stereotype.Service;
@@ -26,9 +28,11 @@ public class CardService {
 
     private static final Logger log = LoggerFactory.getLogger(CardService.class);
     private final CardRepository cardRepository;
+    private final UserRepository userRepository;
 
-    public CardService(CardRepository cardRepository) {
+    public CardService(CardRepository cardRepository, UserRepository userRepository) {
         this.cardRepository = cardRepository;
+        this.userRepository = userRepository;
     }
 
     public List<CardResponseDTO> createCardBatch(CardRequestDTO request) {
@@ -59,6 +63,44 @@ public class CardService {
         log.info("Successfully created {} cards", savedCards.size());
 
         return convertToDTOList(savedCards);
+    }
+
+    @Transactional
+    public int assignCardsToAgent(AssignCardsToAgentRequestDTO request) {
+        log.info("Assigning {} cards to agent ID {}", request.getCardCodes().size(), request.getAgentId());
+
+        User agent = userRepository.findById(request.getAgentId())
+                .orElseThrow(() -> new IllegalArgumentException("Agent not found"));
+
+        if (!agent.getRole().equals(UserRole.AGENT)) {
+            throw new IllegalArgumentException("Provided user is not an agent");
+        }
+
+        List<Card> cards = cardRepository.findAllByCodeIn(request.getCardCodes());
+
+
+        if (cards.size() != request.getCardCodes().size()) {
+            throw new IllegalArgumentException("Some cards do not exist");
+        }
+
+        long invalidCount = cards.stream()
+                .filter(card -> card.isUsed()
+                        || card.getAssignedTo() != null
+                        || card.getBatch() == null
+                        || card.getBatch().getStatus() != FileStatus.PRINTED)
+                .count();
+
+        if (invalidCount > 0) {
+            throw new IllegalArgumentException("Some cards are already assigned, used, or not printed");
+        }
+
+        cards.forEach(card -> card.setAssignedTo(agent));
+
+        cardRepository.saveAll(cards);
+
+        log.info("Successfully assigned {} cards to agent ID {}", cards.size(), agent.getId());
+
+        return cards.size();
     }
 
     protected String generateUniqueCode() {
@@ -104,6 +146,7 @@ public class CardService {
             dto.setStatus(card.getStatus());
             dto.setUsed(card.isUsed());
             dto.setCreatedAt(card.getCreatedAt());
+            dto.setQrImageBase64(card.getQrImageBase64());
             return dto;
         }).collect(Collectors.toList());
     }

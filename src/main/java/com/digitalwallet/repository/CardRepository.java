@@ -15,4 +15,6 @@ public interface CardRepository extends JpaRepository<Card, Long> {
      List<Card> findByBatchIsNullAndValue(int value);
 
     List<Card> findByBatch(File file);
+
+    List<Card> findAllByCodeIn(List<String> codes);
 }

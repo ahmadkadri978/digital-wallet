@@ -1,5 +1,6 @@
 package com.digitalwallet.controller;
 
+import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.service.CardService;
@@ -30,6 +31,15 @@ public class CardController {
         List<CardResponseDTO> response = cardService.createCardBatch(request);
         log.info("Returning response with {] cards", response.size());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/assign-to-agent")
+    public ResponseEntity<String> assignCardsToAgent(@RequestBody @Valid AssignCardsToAgentRequestDTO request) {
+        log.info("Received request to assign {} cards to agent ID {}", request.getCardCodes().size(), request.getAgentId());
+
+        int count = cardService.assignCardsToAgent(request);
+
+        return ResponseEntity.ok(count + " cards successfully assigned to agent ID " + request.getAgentId());
     }
 }
 

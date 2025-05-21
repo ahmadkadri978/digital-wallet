@@ -1,5 +1,6 @@
 package com.digitalwallet.controller;
 
+import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.CardStatus;
@@ -77,6 +78,49 @@ public class CardControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.value").value("Value must be at least 1000"));
+    }
+
+    @Test
+    void shouldAssignCardsSuccessfully() throws Exception {
+        AssignCardsToAgentRequestDTO request = new AssignCardsToAgentRequestDTO();
+        request.setAgentId(3L);
+        request.setCardCodes(List.of("CODE1", "CODE2"));
+
+        when(cardService.assignCardsToAgent(any())).thenReturn(2);
+
+        mockMvc.perform(post("/api/cards/assign-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("2 cards successfully assigned to agent ID 3"));
+    }
+
+    @Test
+    void shouldReturn400_WhenValidationFails() throws Exception {
+        AssignCardsToAgentRequestDTO invalid = new AssignCardsToAgentRequestDTO();
+        invalid.setAgentId(null);
+        invalid.setCardCodes(List.of());
+
+        mockMvc.perform(post("/api/cards/assign-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400_WhenServiceThrowsException() throws Exception {
+        AssignCardsToAgentRequestDTO request = new AssignCardsToAgentRequestDTO();
+        request.setAgentId(5L);
+        request.setCardCodes(List.of("CODE1"));
+
+        when(cardService.assignCardsToAgent(any()))
+                .thenThrow(new IllegalArgumentException("Some cards do not exist"));
+
+        mockMvc.perform(post("/api/cards/assign-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Some cards do not exist"));
     }
 
 
