@@ -4,5 +4,6 @@ public enum UserRole {
     ADMIN,
     AGENT,
     CENTER,
-    WEBSHOP
+    WEBSHOP,
+    END_USER
 }

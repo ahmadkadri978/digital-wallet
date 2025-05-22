@@ -33,6 +33,7 @@ public class AgentControllerTest {
 
     @Test
     void shouldCreateAgentSuccessfully() throws Exception {
+
         AgentRequestDTO request = new AgentRequestDTO();
         request.setUsername("agent1");
         request.setEmail("agent1@email.com");
@@ -46,9 +47,10 @@ public class AgentControllerTest {
         response.setRegion("Homs");
         response.setAssignedSince(LocalDateTime.now());
 
-        when(agentService.createAgent(any(AgentRequestDTO.class))).thenReturn(response);
+        when(agentService.createAgent(eq(1L), any(AgentRequestDTO.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/agents")
+                        .param("currentUserId", "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -57,7 +59,7 @@ public class AgentControllerTest {
     }
 
     @Test
-    void shouldGetAllAgents() throws Exception {
+    void shouldGetAllAgentsSuccessfully() throws Exception {
         AgentResponseDTO agent = new AgentResponseDTO();
         agent.setId(1L);
         agent.setUsername("agent1");
@@ -65,17 +67,52 @@ public class AgentControllerTest {
         agent.setRegion("Homs");
         agent.setAssignedSince(LocalDateTime.now());
 
-        when(agentService.getAllAgents()).thenReturn(List.of(agent));
+        when(agentService.getAllAgents(eq(1L))).thenReturn(List.of(agent));
 
-        mockMvc.perform(get("/api/agents"))
+        mockMvc.perform(get("/api/agents")
+                .param("currentUserId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].username").value("agent1"));
     }
 
     @Test
+    void shouldFailToGetAgents_WhenUnauthorized() throws Exception {
+        when(agentService.getAllAgents(99L))
+                .thenThrow(new SecurityException("Access denied: only Admin can perform this action"));
+
+        mockMvc.perform(get("/api/agents")
+                        .param("currentUserId", "99"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Access denied: only Admin can perform this action"));
+    }
+
+
+    @Test
+    void shouldFailToCreateAgent_WhenUnauthorized() throws Exception {
+        AgentRequestDTO request = new AgentRequestDTO();
+        request.setUsername("agentX");
+        request.setEmail("unauth@email.com");
+        request.setPassword("123456");
+        request.setRegion("Blocked");
+
+        when(agentService.createAgent(eq(99L), any(AgentRequestDTO.class)))
+                .thenThrow(new SecurityException("Access denied: only Admin can perform this action"));
+
+        mockMvc.perform(post("/api/agents")
+                        .param("currentUserId", "99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Access denied: only Admin can perform this action"));
+    }
+
+
+    @Test
     void shouldUpdateAgent() throws Exception {
-        Long id = 1L;
+        Long currentUserId = 1L;
+        Long agentId = 1L;
+
         AgentRequestDTO request = new AgentRequestDTO();
         request.setUsername("updated");
         request.setEmail("new@email.com");
@@ -83,26 +120,29 @@ public class AgentControllerTest {
         request.setRegion("Aleppo");
 
         AgentResponseDTO response = new AgentResponseDTO();
-        response.setId(id);
+        response.setId(agentId);
         response.setUsername("updated");
         response.setEmail("new@email.com");
         response.setRegion("Aleppo");
         response.setAssignedSince(LocalDateTime.now());
 
-        when(agentService.updateAgent(eq(id), any(AgentRequestDTO.class))).thenReturn(response);
+        when(agentService.updateAgent(eq(currentUserId), eq(agentId), any(AgentRequestDTO.class)))
+                .thenReturn(response);
 
-        mockMvc.perform(put("/api/agents/{id}", id)
+        mockMvc.perform(put("/api/agents/{id}", agentId)
+                        .param("currentUserId", currentUserId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("updated"));
     }
 
+
     @Test
     void shouldDeleteAgent() throws Exception {
         Long id = 1L;
 
-        doNothing().when(agentService).deleteAgent(id);
+        doNothing().when(agentService).deleteAgent(eq(1L), id);
 
         mockMvc.perform(delete("/api/agents/{id}", id))
                 .andExpect(status().isNoContent());

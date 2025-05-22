@@ -25,8 +25,10 @@ public class AgentService {
         this.agentProfileRepository = agentProfileRepository;
     }
 
-    public AgentResponseDTO createAgent(AgentRequestDTO request) {
+    public AgentResponseDTO createAgent(Long currentUserId,AgentRequestDTO request) {
         // Create a new user:agent
+        validatePermission(currentUserId);
+
         log.info("Creating new agent: {}", request.getEmail());
         User user = new User();
         user.setUsername(request.getUsername());
@@ -57,7 +59,10 @@ public class AgentService {
         return dto;
     }
 
-    public List<AgentResponseDTO> getAllAgents() {
+    public List<AgentResponseDTO> getAllAgents(Long currentUserId) {
+
+        validatePermission(currentUserId);
+
         log.info("Retrieving all agents");
         List<User> agents = userRepository.findByRole(UserRole.AGENT);
         return agents.stream()
@@ -68,8 +73,12 @@ public class AgentService {
                 .collect(Collectors.toList());
     }
 
-    public AgentResponseDTO updateAgent(Long id, AgentRequestDTO request) {
+    public AgentResponseDTO updateAgent(Long currentUserId, Long id, AgentRequestDTO request) {
+
+        validatePermission(currentUserId);
+
         log.info("Updating agent with ID: {}", id);
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Agent not found"));
 
@@ -92,7 +101,10 @@ public class AgentService {
         return convertToDTO(user, profile);
     }
 
-    public void deleteAgent(Long id) {
+    public void deleteAgent(Long currentUserId, Long id) {
+
+        validatePermission(currentUserId);
+
         log.info("Deleting agent with ID: {}", id);
         AgentProfile profile = agentProfileRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Agent profile not found"));
@@ -102,6 +114,15 @@ public class AgentService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         userRepository.delete(user);
         log.info("Agent with ID {} deleted", id);
+    }
+
+    private void validatePermission(Long userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (!(currentUser.getRole() == UserRole.ADMIN )) {
+            throw new SecurityException("Access denied: only Admin can perform this action");
+        }
     }
 
 }
