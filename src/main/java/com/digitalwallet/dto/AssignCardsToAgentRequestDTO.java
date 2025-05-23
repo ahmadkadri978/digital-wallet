@@ -10,7 +10,7 @@ public class AssignCardsToAgentRequestDTO {
     @NotNull(message = "Agent ID is required")
     private Long agentId;
 
-    @NotEmpty(message = "At least one card ID is required")
+    @NotEmpty(message = "At least one card QR code is required")
     private List<String> cardCodes;
 
     public Long getAgentId() {

@@ -1,6 +1,7 @@
 package com.digitalwallet.controller;
 
 import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
+import com.digitalwallet.dto.AssignCardsToCenterRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.service.CardService;
@@ -34,6 +35,7 @@ public class CardController {
     }
 
     @PostMapping("/assign-to-agent")
+    // We must validate that the current user has_Role Admin
     public ResponseEntity<String> assignCardsToAgent(@RequestBody @Valid AssignCardsToAgentRequestDTO request) {
         log.info("Received request to assign {} cards to agent ID {}", request.getCardCodes().size(), request.getAgentId());
 
@@ -41,6 +43,19 @@ public class CardController {
 
         return ResponseEntity.ok(count + " cards successfully assigned to agent ID " + request.getAgentId());
     }
+
+    @PostMapping("/assign-to-center")
+    public ResponseEntity<String> assignCardsToCenter(
+            @RequestParam Long currentUserId,
+            @RequestBody @Valid AssignCardsToCenterRequestDTO request) {
+
+        log.info("Agent ID {} is assigning cards to Center ID {}", currentUserId, request.getPurchaseCenterId());
+
+        cardService.assignCardsToCenter(currentUserId, request);
+
+        return ResponseEntity.ok("Cards successfully assigned to center ID " + request.getPurchaseCenterId());
+    }
+
 
     @GetMapping("/all")
     public ResponseEntity<List<CardResponseDTO>> getAllCards() {

@@ -1,6 +1,7 @@
 package com.digitalwallet.service;
 
 import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
+import com.digitalwallet.dto.AssignCardsToCenterRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.*;
@@ -38,8 +39,6 @@ public class CardService {
         this.cardMapper = cardMapper;
 
     }
-
-
 
     public List<CardResponseDTO> createCardBatch(CardRequestDTO request) {
 
@@ -108,6 +107,52 @@ public class CardService {
 
         return cards.size();
     }
+
+    public void assignCardsToCenter(Long currentUserId, AssignCardsToCenterRequestDTO request) {
+        log.info("User {} is attempting to assign cards to center {}", currentUserId, request.getPurchaseCenterId());
+
+        // Verifying that the current user is an Agent
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (currentUser.getRole() != UserRole.AGENT) {
+            throw new SecurityException("Only AGENT users can assign cards to centers");
+        }
+
+        // Verifying that the center exists
+        User purchaseCenter = userRepository.findById(request.getPurchaseCenterId())
+                .orElseThrow(() -> new IllegalArgumentException("Purchase center not found"));
+
+        if (purchaseCenter.getRole() != UserRole.CENTER) {
+            throw new IllegalArgumentException("Target user is not a valid purchase center");
+        }
+
+        // Fetching cards based on QR codes
+        List<Card> cards = cardRepository.findAllByCodeIn(request.getCardQRCodes());
+
+        if (cards.size() != request.getCardQRCodes().size()) {
+            throw new IllegalArgumentException("Some cards were not found by provided QR codes");
+        }
+
+        // Verify that the cards are printed and assigned to the agent.
+        for (Card card : cards) {
+            if (card.getBatch() == null || card.getBatch().getStatus() != FileStatus.PRINTED) {
+                throw new IllegalStateException("Card " + card.getCode() + " does not belong to a printed file");
+            }
+
+            if (card.getAssignedTo() == null || !card.getAssignedTo().getId().equals(currentUserId)) {
+                throw new SecurityException("Agent is not allowed to assign card " + card.getCode() + " that is not owned by them");
+            }
+        }
+
+        // Assigning cards to the center
+        cards.forEach(card -> card.setAssignedTo(purchaseCenter));
+        cardRepository.saveAll(cards);
+
+        log.info("Assigned {} cards to center ID {} by agent ID {}", cards.size(), purchaseCenter.getId(), currentUserId);
+    }
+
+
 
     public List<CardResponseDTO> getAllCards() {
         List<Card> cards = cardRepository.findAll();
