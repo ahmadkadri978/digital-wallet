@@ -1,6 +1,7 @@
 package com.digitalwallet.controller;
 
 import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
+import com.digitalwallet.dto.AssociateCardsRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.CardStatus;
@@ -108,6 +109,55 @@ public class CardControllerTest {
                         .content(objectMapper.writeValueAsString(invalid)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void associateCardsWithAgent_ShouldReturnOk() throws Exception {
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(1L);
+        request.setFileId(10L);
+
+        mockMvc.perform(post("/api/cards/associate-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(cardService).associateCardsWithAgent(any(AssociateCardsRequestDTO.class));
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldReturnBadRequest_WhenServiceThrowsIllegalArgumentException() throws Exception {
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(1L);
+        request.setFileId(10L);
+
+        doThrow(new IllegalArgumentException("Agent not found"))
+                .when(cardService).associateCardsWithAgent(any(AssociateCardsRequestDTO.class));
+
+        mockMvc.perform(post("/api/cards/associate-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Agent not found"));
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldReturnForbidden_WhenServiceThrowsSecurityException() throws Exception {
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(1L);
+        request.setFileId(10L);
+
+        doThrow(new SecurityException("Only agents can receive cards"))
+                .when(cardService).associateCardsWithAgent(any(AssociateCardsRequestDTO.class));
+
+        mockMvc.perform(post("/api/cards/associate-to-agent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Only agents can receive cards"));
+    }
+
+
+
 
 
     @Test

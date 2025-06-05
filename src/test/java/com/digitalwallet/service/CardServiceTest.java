@@ -1,11 +1,13 @@
 package com.digitalwallet.service;
 
 import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
+import com.digitalwallet.dto.AssociateCardsRequestDTO;
 import com.digitalwallet.dto.CardRequestDTO;
 import com.digitalwallet.dto.CardResponseDTO;
 import com.digitalwallet.entity.*;
 import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
+import com.digitalwallet.repository.FileRepository;
 import com.digitalwallet.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import static org.mockito.Mockito.*;
 public class CardServiceTest {
 
     private CardRepository cardRepository;
+    private  FileRepository fileRepository;
     private UserRepository userRepository;
     private CardService cardService;
     private CardMapper cardMapper;
@@ -28,9 +31,10 @@ public class CardServiceTest {
     void setUp() {
         cardRepository = mock(CardRepository.class);
         userRepository = mock(UserRepository.class);
+        fileRepository = mock(FileRepository.class);
         cardMapper = mock(CardMapper.class);
 
-        cardService = spy(new CardService(cardRepository, userRepository, cardMapper));
+        cardService = spy(new CardService(fileRepository, cardRepository, userRepository, cardMapper));
     }
 
 
@@ -200,6 +204,131 @@ public class CardServiceTest {
         );
 
         assertEquals("Some cards are already assigned, used, or not printed", ex.getMessage());
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldSucceed() {
+        Long agentId = 1L;
+        Long fileId = 10L;
+
+        User agent = new User();
+        agent.setId(agentId);
+        agent.setRole(UserRole.AGENT);
+
+        File file = new File();
+        file.setId(fileId);
+
+        List<Card> cards = List.of(new Card(), new Card());
+
+        when(userRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(fileRepository.findById(fileId)).thenReturn(Optional.of(file));
+        when(cardRepository.findByBatch(file)).thenReturn(cards);
+
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(agentId);
+        request.setFileId(fileId);
+
+        assertDoesNotThrow(() -> cardService.associateCardsWithAgent(request));
+
+        verify(cardRepository).saveAll(cards);
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldFail_WhenAgentNotFound() {
+        Long agentId = 1L;
+        Long fileId = 10L;
+
+        when(userRepository.findById(agentId)).thenReturn(Optional.empty());
+
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(agentId);
+        request.setFileId(fileId);
+
+        Exception ex = assertThrows(IllegalArgumentException.class, () ->
+                cardService.associateCardsWithAgent(request)
+        );
+
+        assertEquals("Agent not found", ex.getMessage());
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldFail_WhenAgentRoleInvalid() {
+        Long agentId = 1L;
+        Long fileId = 10L;
+
+        User user = new User();
+        user.setId(agentId);
+        user.setRole(UserRole.END_USER);
+
+        when(userRepository.findById(agentId)).thenReturn(Optional.of(user));
+
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(agentId);
+        request.setFileId(fileId);
+
+        Exception ex = assertThrows(SecurityException.class, () ->
+                cardService.associateCardsWithAgent(request)
+        );
+
+        assertEquals("Only agents can receive cards", ex.getMessage());
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldFail_WhenFileNotFound() {
+        Long agentId = 1L;
+        Long fileId = 10L;
+
+        User agent = new User();
+        agent.setId(agentId);
+        agent.setRole(UserRole.AGENT);
+
+        when(userRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(fileRepository.findById(fileId)).thenReturn(Optional.empty());
+
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(agentId);
+        request.setFileId(fileId);
+
+        Exception ex = assertThrows(IllegalArgumentException.class, () ->
+                cardService.associateCardsWithAgent(request)
+        );
+
+        assertEquals("File not found", ex.getMessage());
+    }
+
+    @Test
+    void associateCardsWithAgent_ShouldFail_WhenCardsAlreadyAssigned() {
+        Long agentId = 1L;
+        Long fileId = 10L;
+
+        User agent = new User();
+        agent.setId(agentId);
+        agent.setRole(UserRole.AGENT);
+
+        File file = new File();
+        file.setId(fileId);
+
+        User anotherAgent = new User();
+        anotherAgent.setId(2L);
+
+        Card assignedCard = new Card();
+        assignedCard.setAssignedTo(anotherAgent);
+
+        List<Card> cards = List.of(assignedCard);
+
+        when(userRepository.findById(agentId)).thenReturn(Optional.of(agent));
+        when(fileRepository.findById(fileId)).thenReturn(Optional.of(file));
+        when(cardRepository.findByBatch(file)).thenReturn(cards);
+
+        AssociateCardsRequestDTO request = new AssociateCardsRequestDTO();
+        request.setAgentId(agentId);
+        request.setFileId(fileId);
+
+        Exception ex = assertThrows(IllegalStateException.class, () ->
+                cardService.associateCardsWithAgent(request)
+        );
+
+        assertEquals("Some cards are already assigned to another agent. Please contact support.", ex.getMessage());
     }
 
 

@@ -46,5 +46,12 @@ public class FileController {
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }
+
+    @PostMapping("/{id}/mark-printed")
+    public ResponseEntity<Void> markFileAsPrinted(@PathVariable Long id) {
+        fileService.markFileAsPrinted(id);
+        return ResponseEntity.ok().build();
+    }
+
 }
 

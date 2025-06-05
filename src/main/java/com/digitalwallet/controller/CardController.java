@@ -1,9 +1,6 @@
 package com.digitalwallet.controller;
 
-import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
-import com.digitalwallet.dto.AssignCardsToCenterRequestDTO;
-import com.digitalwallet.dto.CardRequestDTO;
-import com.digitalwallet.dto.CardResponseDTO;
+import com.digitalwallet.dto.*;
 import com.digitalwallet.service.CardService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -37,11 +34,22 @@ public class CardController {
     @PostMapping("/assign-to-agent")
     // We must validate that the current user has_Role Admin
     public ResponseEntity<String> assignCardsToAgent(@RequestBody @Valid AssignCardsToAgentRequestDTO request) {
+
         log.info("Received request to assign {} cards to agent ID {}", request.getCardCodes().size(), request.getAgentId());
 
         int count = cardService.assignCardsToAgent(request);
 
         return ResponseEntity.ok(count + " cards successfully assigned to agent ID " + request.getAgentId());
+    }
+
+    @PostMapping("/associate-to-agent")
+    public ResponseEntity<Void> associateCardsWithAgent(@RequestBody @Valid AssociateCardsRequestDTO request) {
+
+        log.info("Received request to associate cards from file ID {} to agent ID {}", request.getFileId(), request.getAgentId());
+
+        cardService.associateCardsWithAgent(request);
+
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/assign-to-center")

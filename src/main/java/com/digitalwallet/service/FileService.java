@@ -73,12 +73,19 @@ public class FileService {
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
         List<Card> cards = cardRepository.findByBatch(file);
-        file.setStatus(FileStatus.PRINTED);
-        fileRepository.save(file);
+//        file.setStatus(FileStatus.PRINTED);
+//        fileRepository.save(file);
 
         log.info("Generating PDF for {} cards linked to file ID {}", cards.size(), file.getId());
 
         return pdfGeneratorService.generateCardListPdf(cards);
+    }
+
+    public void markFileAsPrinted(Long fileId) {
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new IllegalArgumentException("File not found"));
+        file.setStatus(FileStatus.PRINTED);
+        fileRepository.save(file);
     }
 
     private FileResponseDTO convertToDTOList(File file) {

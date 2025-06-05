@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -107,5 +108,15 @@ public class FileControllerTest {
         mockMvc.perform(get("/api/files/100/download"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("File not found"));
+    }
+
+    @Test
+    void markFileAsPrinted_ShouldReturnOk() throws Exception {
+        Long fileId = 1L;
+
+        mockMvc.perform(post("/api/files/{id}/mark-printed", fileId))
+                .andExpect(status().isOk());
+
+        verify(fileService).markFileAsPrinted(fileId);
     }
 }

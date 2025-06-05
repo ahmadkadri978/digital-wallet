@@ -1,12 +1,10 @@
 package com.digitalwallet.service;
 
-import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
-import com.digitalwallet.dto.AssignCardsToCenterRequestDTO;
-import com.digitalwallet.dto.CardRequestDTO;
-import com.digitalwallet.dto.CardResponseDTO;
+import com.digitalwallet.dto.*;
 import com.digitalwallet.entity.*;
 import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
+import com.digitalwallet.repository.FileRepository;
 import com.digitalwallet.repository.UserRepository;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -30,10 +28,12 @@ public class CardService {
 
     private static final Logger log = LoggerFactory.getLogger(CardService.class);
     private final CardRepository cardRepository;
+    private final FileRepository fileRepository;
     private final UserRepository userRepository;
     private final CardMapper cardMapper;
 
-    public CardService(CardRepository cardRepository, UserRepository userRepository,CardMapper cardMapper) {
+    public CardService(FileRepository fileRepository, CardRepository cardRepository, UserRepository userRepository,CardMapper cardMapper) {
+        this.fileRepository = fileRepository;
         this.cardRepository = cardRepository;
         this.userRepository = userRepository;
         this.cardMapper = cardMapper;
@@ -107,6 +107,37 @@ public class CardService {
 
         return cards.size();
     }
+
+        public void associateCardsWithAgent(AssociateCardsRequestDTO request) {
+            // Validate Agent
+
+            log.info("Associating cards from file ID {} to agent ID {}", request.getFileId(), request.getAgentId());
+
+            User agent = userRepository.findById(request.getAgentId())
+                    .orElseThrow(() -> new IllegalArgumentException("Agent not found"));
+
+            if (!agent.getRole().equals(UserRole.AGENT)) {
+                throw new SecurityException("Only agents can receive cards");
+            }
+
+            // Validate File
+            File file = fileRepository.findById(request.getFileId())
+                    .orElseThrow(() -> new IllegalArgumentException("File not found"));
+
+            // Fetch Cards
+            List<Card> cards = cardRepository.findByBatch(file);
+            log.info("Found {} cards linked to file ID {}", cards.size(), file.getId());
+
+            // Associate Cards
+            boolean anyAlreadyAssigned = cards.stream().anyMatch(card -> card.getAssignedTo() != null);
+            if (anyAlreadyAssigned) {
+                throw new IllegalStateException("Some cards are already assigned to another agent. Please contact support.");
+            }
+            cards.forEach(card -> card.setAssignedTo(agent));
+            cardRepository.saveAll(cards);
+
+            log.info("Successfully associated {} cards with agent ID {}", cards.size(), agent.getId());
+        }
 
     public void assignCardsToCenter(Long currentUserId, AssignCardsToCenterRequestDTO request) {
         log.info("User {} is attempting to assign cards to center {}", currentUserId, request.getPurchaseCenterId());
