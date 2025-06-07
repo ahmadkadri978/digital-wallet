@@ -218,8 +218,6 @@ public class CardControllerTest {
 
 
 
-
-
     @Test
     void getAllCards_shouldReturnListOfCardResponseDTO() throws Exception {
         CardResponseDTO card1 = new CardResponseDTO();

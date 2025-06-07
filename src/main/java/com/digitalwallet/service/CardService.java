@@ -134,6 +134,7 @@ public class CardService {
                 throw new IllegalStateException("Some cards are already assigned to another agent. Please contact support.");
             }
             cards.forEach(card -> card.setAssignedTo(agent));
+            cards.forEach(card -> card.setStatus(CardStatus.ASSIGNED));
             cardRepository.saveAll(cards);
 
             log.info("Successfully associated {} cards with agent ID {}", cards.size(), agent.getId());
@@ -202,11 +203,11 @@ public class CardService {
             throw new SecurityException("Access denied: This card is not assigned to this agent.");
         }
 
-        if (card.isUsed()) {
-            throw new IllegalStateException("Card is already used or activated.");
+        if (card.getStatus() == CardStatus.ACTIVATED) {
+            throw new IllegalStateException("Card is already activated.");
         }
 
-        card.setUsed(true);
+        card.setStatus(CardStatus.ACTIVATED);
         cardRepository.save(card);
 
         log.info("Card ID {} has been activated successfully by Agent ID {}", cardId, agentId);

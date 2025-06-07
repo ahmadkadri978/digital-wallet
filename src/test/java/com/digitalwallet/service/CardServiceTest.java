@@ -342,13 +342,13 @@ public class CardServiceTest {
         Card card = new Card();
         card.setId(cardId);
         card.setAssignedTo(agent);
-        card.setUsed(false);
+        card.setStatus(CardStatus.ASSIGNED);
 
         when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
 
         assertDoesNotThrow(() -> cardService.activateCard(cardId, agentId));
         verify(cardRepository).save(card);
-        assertTrue(card.isUsed());
+        assertTrue(card.getStatus().equals(CardStatus.ACTIVATED));
     }
 
     @Test
@@ -376,7 +376,7 @@ public class CardServiceTest {
         Card card = new Card();
         card.setId(cardId);
         card.setAssignedTo(anotherAgent);
-        card.setUsed(false);
+        card.setStatus(CardStatus.ASSIGNED);
 
         when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
 
@@ -398,7 +398,7 @@ public class CardServiceTest {
         Card card = new Card();
         card.setId(cardId);
         card.setAssignedTo(agent);
-        card.setUsed(true);
+        card.setStatus(CardStatus.ACTIVATED);
 
         when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
 
@@ -406,7 +406,7 @@ public class CardServiceTest {
                 cardService.activateCard(cardId, agentId)
         );
 
-        assertEquals("Card is already used or activated.", ex.getMessage());
+        assertEquals("Card is already activated.", ex.getMessage());
     }
 
 
