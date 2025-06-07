@@ -1,9 +1,6 @@
 package com.digitalwallet.controller;
 
-import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
-import com.digitalwallet.dto.AssociateCardsRequestDTO;
-import com.digitalwallet.dto.CardRequestDTO;
-import com.digitalwallet.dto.CardResponseDTO;
+import com.digitalwallet.dto.*;
 import com.digitalwallet.entity.CardStatus;
 import com.digitalwallet.service.CardService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -154,6 +151,69 @@ public class CardControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Only agents can receive cards"));
+    }
+
+    @Test
+    void activateCard_ShouldReturnOk() throws Exception {
+        Long cardId = 1L;
+        ActivateCardRequestDTO request = new ActivateCardRequestDTO();
+        request.setAgentId(10L);
+
+        mockMvc.perform(post("/api/cards/{cardId}/activate", cardId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Card activated successfully."));
+
+        verify(cardService).activateCard(cardId, 10L);
+    }
+
+    @Test
+    void activateCard_ShouldReturnForbidden_WhenSecurityExceptionThrown() throws Exception {
+        Long cardId = 1L;
+        ActivateCardRequestDTO request = new ActivateCardRequestDTO();
+        request.setAgentId(10L);
+
+        doThrow(new SecurityException("Access denied: This card is not assigned to this agent."))
+                .when(cardService).activateCard(cardId, 10L);
+
+        mockMvc.perform(post("/api/cards/{cardId}/activate", cardId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Access denied: This card is not assigned to this agent."));
+    }
+
+    @Test
+    void activateCard_ShouldReturnBadRequest_WhenIllegalArgumentExceptionThrown() throws Exception {
+        Long cardId = 1L;
+        ActivateCardRequestDTO request = new ActivateCardRequestDTO();
+        request.setAgentId(10L);
+
+        doThrow(new IllegalArgumentException("Card not found"))
+                .when(cardService).activateCard(cardId, 10L);
+
+        mockMvc.perform(post("/api/cards/{cardId}/activate", cardId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Card not found"));
+    }
+
+    @Test
+    void activateCard_ShouldReturnConflict_WhenIllegalStateExceptionThrown() throws Exception {
+        Long cardId = 1L;
+        ActivateCardRequestDTO request = new ActivateCardRequestDTO();
+        request.setAgentId(10L);
+
+        doThrow(new IllegalStateException("Card is already used or activated."))
+                .when(cardService).activateCard(cardId, 10L);
+
+        mockMvc.perform(post("/api/cards/{cardId}/activate", cardId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Card is already used or activated."));
     }
 
 

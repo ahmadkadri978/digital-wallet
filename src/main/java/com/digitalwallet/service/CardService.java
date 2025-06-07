@@ -192,6 +192,26 @@ public class CardService {
                 .collect(Collectors.toList());
     }
 
+    public void activateCard(Long cardId, Long agentId) {
+        log.info("Agent ID {} is requesting activation for Card ID {}", agentId, cardId);
+
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+
+        if (card.getAssignedTo() == null || !card.getAssignedTo().getId().equals(agentId)) {
+            throw new SecurityException("Access denied: This card is not assigned to this agent.");
+        }
+
+        if (card.isUsed()) {
+            throw new IllegalStateException("Card is already used or activated.");
+        }
+
+        card.setUsed(true);
+        cardRepository.save(card);
+
+        log.info("Card ID {} has been activated successfully by Agent ID {}", cardId, agentId);
+    }
+
 
 
     protected String generateUniqueCode() {

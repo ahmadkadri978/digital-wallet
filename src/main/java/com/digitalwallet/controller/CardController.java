@@ -64,6 +64,15 @@ public class CardController {
         return ResponseEntity.ok("Cards successfully assigned to center ID " + request.getPurchaseCenterId());
     }
 
+    @PostMapping("/{cardId}/activate")
+    public ResponseEntity<String> activateCard(
+            @PathVariable Long cardId,
+            @RequestBody @Valid ActivateCardRequestDTO request) {
+        log.info("Received request to activate Card ID {}", cardId);
+        cardService.activateCard(cardId, request.getAgentId());
+        return ResponseEntity.ok("Card activated successfully.");
+    }
+
 
     @GetMapping("/all")
     public ResponseEntity<List<CardResponseDTO>> getAllCards() {

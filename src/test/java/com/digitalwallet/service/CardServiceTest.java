@@ -331,6 +331,84 @@ public class CardServiceTest {
         assertEquals("Some cards are already assigned to another agent. Please contact support.", ex.getMessage());
     }
 
+    @Test
+    void activateCard_ShouldSucceed_WhenCardBelongsToAgent() {
+        Long cardId = 1L;
+        Long agentId = 10L;
+
+        User agent = new User();
+        agent.setId(agentId);
+
+        Card card = new Card();
+        card.setId(cardId);
+        card.setAssignedTo(agent);
+        card.setUsed(false);
+
+        when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+
+        assertDoesNotThrow(() -> cardService.activateCard(cardId, agentId));
+        verify(cardRepository).save(card);
+        assertTrue(card.isUsed());
+    }
+
+    @Test
+    void activateCard_ShouldFail_WhenCardNotFound() {
+        Long cardId = 1L;
+        Long agentId = 10L;
+
+        when(cardRepository.findById(cardId)).thenReturn(Optional.empty());
+
+        Exception ex = assertThrows(IllegalArgumentException.class, () ->
+                cardService.activateCard(cardId, agentId)
+        );
+
+        assertEquals("Card not found", ex.getMessage());
+    }
+
+    @Test
+    void activateCard_ShouldFail_WhenCardAssignedToAnotherAgent() {
+        Long cardId = 1L;
+        Long agentId = 10L;
+
+        User anotherAgent = new User();
+        anotherAgent.setId(20L);
+
+        Card card = new Card();
+        card.setId(cardId);
+        card.setAssignedTo(anotherAgent);
+        card.setUsed(false);
+
+        when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+
+        Exception ex = assertThrows(SecurityException.class, () ->
+                cardService.activateCard(cardId, agentId)
+        );
+
+        assertEquals("Access denied: This card is not assigned to this agent.", ex.getMessage());
+    }
+
+    @Test
+    void activateCard_ShouldFail_WhenCardAlreadyUsed() {
+        Long cardId = 1L;
+        Long agentId = 10L;
+
+        User agent = new User();
+        agent.setId(agentId);
+
+        Card card = new Card();
+        card.setId(cardId);
+        card.setAssignedTo(agent);
+        card.setUsed(true);
+
+        when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+
+        Exception ex = assertThrows(IllegalStateException.class, () ->
+                cardService.activateCard(cardId, agentId)
+        );
+
+        assertEquals("Card is already used or activated.", ex.getMessage());
+    }
+
 
     @Test
     void getAllCards_shouldReturnMappedDTOs() {
