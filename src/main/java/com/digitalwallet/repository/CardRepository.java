@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CardRepository extends JpaRepository<Card, Long> {
      //Page<Card> findByStatus(CardStatus status, Pageable pageable);
@@ -17,4 +18,8 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     List<Card> findByBatch(File file);
 
     List<Card> findAllByCodeIn(List<String> codes);
+
+    Optional<Card> findByCode(String code);
+
+    List<Card> findByCodeIn(List<String> codes);
 }

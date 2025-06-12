@@ -216,6 +216,71 @@ public class CardControllerTest {
                 .andExpect(jsonPath("$.error").value("Card is already used or activated."));
     }
 
+    @Test
+    void payWithCard_ShouldReturnOk() throws Exception {
+        CardPaymentRequestDTO request = new CardPaymentRequestDTO();
+        request.setCode("CARD123");
+        request.setAmount(50);
+
+        when(cardService.processCardPayment(any(CardPaymentRequestDTO.class)))
+                .thenReturn(50);
+
+        mockMvc.perform(post("/api/cards/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Payment processed successfully"))
+                .andExpect(jsonPath("$.remainingBalance").value(50));
+
+        verify(cardService).processCardPayment(any(CardPaymentRequestDTO.class));
+    }
+
+    @Test
+    void payWithCard_ShouldReturnBadRequest_WhenCardNotFound() throws Exception {
+        CardPaymentRequestDTO request = new CardPaymentRequestDTO();
+        request.setCode("CARD123");
+        request.setAmount(50);
+
+        doThrow(new IllegalArgumentException("Card not found"))
+                .when(cardService).processCardPayment(any(CardPaymentRequestDTO.class));
+
+        mockMvc.perform(post("/api/cards/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Card not found"));
+    }
+
+    @Test
+    void payWithCard_ShouldReturnConflict_WhenCardIsNotActivatedOrInsufficientBalance() throws Exception {
+        CardPaymentRequestDTO request = new CardPaymentRequestDTO();
+        request.setCode("CARD123");
+        request.setAmount(50);
+
+        doThrow(new IllegalStateException("Card is not activated"))
+                .when(cardService).processCardPayment(any(CardPaymentRequestDTO.class));
+
+        mockMvc.perform(post("/api/cards/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Card is not activated"));
+    }
+
+    @Test
+    void payWithCard_ShouldReturnBadRequest_WhenValidationFails() throws Exception {
+        CardPaymentRequestDTO request = new CardPaymentRequestDTO();
+        request.setCode(""); // intentionally empty to trigger @NotBlank
+        request.setAmount(0); // invalid amount
+
+        mockMvc.perform(post("/api/cards/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.amount").exists());
+    }
+
 
 
     @Test
@@ -244,6 +309,60 @@ public class CardControllerTest {
                 .andExpect(jsonPath("$[1].status").value("USED"));
 
         verify(cardService, times(1)).getAllCards();
+    }
+
+    @Test
+    void useCardsForPayment_ShouldReturnSuccess() throws Exception {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CODE123"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(1L);
+        request.setOrderId("ORD001");
+
+        CardPaymentResponseDTO response = new CardPaymentResponseDTO();
+        response.setPaidAmount(50.0);
+        response.setRemainingAmount(0.0);
+        response.setPaymentStatus("SUCCESS");
+        response.setMessage("Payment processed successfully.");
+
+        when(cardService.useCardsForPayment(any(CardUsageRequestDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/cards/use")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.paidAmount").value(50.0));
+    }
+
+    @Test
+    void useCardsForPayment_ShouldReturnBadRequest_WhenValidationFails() throws Exception {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of()); // invalid input
+        request.setPurchaseAmount(0.0);
+        request.setAgentId(1L);
+
+        mockMvc.perform(post("/api/cards/use")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void useCardsForPayment_ShouldReturnForbidden_WhenSecurityException() throws Exception {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CODE123"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(99L);
+
+        when(cardService.useCardsForPayment(any(CardUsageRequestDTO.class)))
+                .thenThrow(new SecurityException("Access denied"));
+
+        mockMvc.perform(post("/api/cards/use")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Access denied"));
     }
 
     private CardResponseDTO createCardDTO(Long id, String code) {

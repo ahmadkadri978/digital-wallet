@@ -4,6 +4,7 @@ import com.digitalwallet.dto.*;
 import com.digitalwallet.entity.*;
 import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
+import com.digitalwallet.repository.CardTransactionLogRepository;
 import com.digitalwallet.repository.FileRepository;
 import com.digitalwallet.repository.UserRepository;
 import com.google.zxing.BarcodeFormat;
@@ -30,12 +31,15 @@ public class CardService {
     private final CardRepository cardRepository;
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
+
+    private final CardTransactionLogRepository transactionLogRepository;
     private final CardMapper cardMapper;
 
-    public CardService(FileRepository fileRepository, CardRepository cardRepository, UserRepository userRepository,CardMapper cardMapper) {
+    public CardService(FileRepository fileRepository, CardRepository cardRepository, UserRepository userRepository, CardTransactionLogRepository transactionLogRepository,CardMapper cardMapper) {
         this.fileRepository = fileRepository;
         this.cardRepository = cardRepository;
         this.userRepository = userRepository;
+        this.transactionLogRepository = transactionLogRepository;
         this.cardMapper = cardMapper;
 
     }
@@ -211,6 +215,114 @@ public class CardService {
         cardRepository.save(card);
 
         log.info("Card ID {} has been activated successfully by Agent ID {}", cardId, agentId);
+    }
+
+
+    @Transactional
+    public int processCardPayment(CardPaymentRequestDTO request) {
+        log.info("Processing payment with card code {}", request.getCode());
+
+        // 1. Fetch card by code
+        Optional<Card> optionalCard = cardRepository.findByCode(request.getCode());
+        if (optionalCard.isEmpty()) {
+            throw new IllegalArgumentException("Card not found");
+        }
+
+        Card card = optionalCard.get();
+
+        // 2. Validate card status
+        if (card.getStatus() != CardStatus.ACTIVATED) {
+            throw new IllegalStateException("Card is not activated");
+        }
+
+        // 3. Check balance
+        if (card.getValue() < request.getAmount()) {
+            throw new IllegalStateException("Insufficient balance on the card");
+        }
+
+        // 4. Deduct amount
+        card.setValue(card.getValue() - request.getAmount());
+
+        // 5. Save updated card
+        cardRepository.save(card);
+
+        log.info("Payment of {} processed successfully using card code {}", request.getAmount(), request.getCode());
+
+        return card.getValue();
+    }
+
+    @Transactional
+    public CardPaymentResponseDTO useCardsForPayment(CardUsageRequestDTO request) {
+        log.info("Processing payment request: {}", request);
+
+        double purchaseAmount = request.getPurchaseAmount();
+        double remainingAmount = purchaseAmount;
+        double paidAmount = 0.0;
+
+        List<Card> cards = cardRepository.findByCodeIn(request.getCodes());
+
+        if (cards.isEmpty()) {
+            throw new IllegalArgumentException("No cards found for the provided codes.");
+        }
+
+        for (Card card : cards) {
+            log.info("Processing card: {}", card.getCode());
+
+            if (card.getStatus() != CardStatus.ACTIVATED) {
+                throw new IllegalStateException("Card with code " + card.getCode() + " is not activated.");
+            }
+
+            if (!card.getAssignedTo().getId().equals(request.getAgentId())) {
+                throw new SecurityException("Access denied: card does not belong to this agent.");
+            }
+
+            double availableBalance = card.getValue();
+
+            if (availableBalance >= remainingAmount) {
+                card.setValue((int) (availableBalance - remainingAmount));
+                paidAmount += remainingAmount;
+                log.info("Deducted {} from card {}", remainingAmount, card.getCode());
+                remainingAmount = 0.0;
+            } else {
+                card.setValue(0);
+                paidAmount += availableBalance;
+                remainingAmount -= availableBalance;
+                log.info("Deducted {} from card {}. Remaining to be paid: {}", availableBalance, card.getCode(), remainingAmount);
+            }
+
+            cardRepository.save(card);
+
+            // Log each card transaction
+            CardTransactionLog logEntry = new CardTransactionLog();
+            logEntry.setCardCode(card.getCode());
+            logEntry.setAmountDeducted(paidAmount);
+            logEntry.setRemainingBalance(card.getValue());
+            logEntry.setOrderId(request.getOrderId());
+            logEntry.setTransactionDate(LocalDateTime.now());
+            logEntry.setAgentId(request.getAgentId());
+            logEntry.setPaymentStatus(remainingAmount > 0 ? PaymentStatus.FAILED.name() : PaymentStatus.SUCCESS.name());
+            transactionLogRepository.save(logEntry);
+
+            if (remainingAmount == 0.0) {
+                break;
+            }
+        }
+
+        // Prepare Response DTO
+        CardPaymentResponseDTO response = new CardPaymentResponseDTO();
+        response.setPaidAmount(paidAmount);
+        response.setRemainingAmount(remainingAmount);
+
+        if (remainingAmount > 0) {
+            response.setPaymentStatus(PaymentStatus.FAILED.name());
+            response.setMessage("Insufficient balance. Please top up your cards.");
+        } else {
+            response.setPaymentStatus(PaymentStatus.SUCCESS.name());
+            response.setMessage("Payment processed successfully.");
+        }
+
+        log.info("Payment result: {}", response);
+        return response;
     }
 
 

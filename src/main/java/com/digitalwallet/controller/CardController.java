@@ -73,6 +73,26 @@ public class CardController {
         return ResponseEntity.ok("Card activated successfully.");
     }
 
+//    @PostMapping("/pay")
+//    public ResponseEntity<CardPaymentResponseDTO> payWithCard(@RequestBody @Valid CardPaymentRequestDTO request) {
+//        log.info("Received payment request with card code {}", request.getCode());
+//
+//        int remainingBalance = cardService.processCardPayment(request);
+//
+//        CardPaymentResponseDTO response = new CardPaymentResponseDTO();
+//        response.setMessage("Payment processed successfully");
+//        response.setRemainingBalance(remainingBalance);
+//
+//        return ResponseEntity.ok(response);
+//    }
+
+    @PostMapping("/use")
+    public ResponseEntity<CardPaymentResponseDTO> useCards(@Valid @RequestBody CardUsageRequestDTO request) {
+        CardPaymentResponseDTO response = cardService.useCardsForPayment(request);
+        return ResponseEntity.ok(response);
+    }
+
+
 
     @GetMapping("/all")
     public ResponseEntity<List<CardResponseDTO>> getAllCards() {

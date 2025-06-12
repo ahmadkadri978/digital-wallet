@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleSecurity(SecurityException ex) {
         Map<String, String> response = new HashMap<>();
         response.put("error", ex.getMessage());
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST); // status(HttpStatus.FORBIDDEN)
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST); // I should change it later to status(HttpStatus.FORBIDDEN)
     }
 
 }

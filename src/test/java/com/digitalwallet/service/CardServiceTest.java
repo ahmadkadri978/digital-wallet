@@ -1,12 +1,10 @@
 package com.digitalwallet.service;
 
-import com.digitalwallet.dto.AssignCardsToAgentRequestDTO;
-import com.digitalwallet.dto.AssociateCardsRequestDTO;
-import com.digitalwallet.dto.CardRequestDTO;
-import com.digitalwallet.dto.CardResponseDTO;
+import com.digitalwallet.dto.*;
 import com.digitalwallet.entity.*;
 import com.digitalwallet.mapper.CardMapper;
 import com.digitalwallet.repository.CardRepository;
+import com.digitalwallet.repository.CardTransactionLogRepository;
 import com.digitalwallet.repository.FileRepository;
 import com.digitalwallet.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +23,7 @@ public class CardServiceTest {
     private  FileRepository fileRepository;
     private UserRepository userRepository;
     private CardService cardService;
+    private CardTransactionLogRepository transactionLogRepository;
     private CardMapper cardMapper;
 
     @BeforeEach
@@ -32,9 +31,10 @@ public class CardServiceTest {
         cardRepository = mock(CardRepository.class);
         userRepository = mock(UserRepository.class);
         fileRepository = mock(FileRepository.class);
+        transactionLogRepository = mock(CardTransactionLogRepository.class);
         cardMapper = mock(CardMapper.class);
 
-        cardService = spy(new CardService(fileRepository, cardRepository, userRepository, cardMapper));
+        cardService = spy(new CardService(fileRepository, cardRepository, userRepository, transactionLogRepository,cardMapper));
     }
 
 
@@ -408,6 +408,202 @@ public class CardServiceTest {
 
         assertEquals("Card is already activated.", ex.getMessage());
     }
+
+    @Test
+    void processCardPayment_ShouldSucceed_WhenBalanceIsSufficientAndCardIsActivated() {
+        String code = "CARD123";
+        int amount = 50;
+
+        Card card = new Card();
+        card.setCode(code);
+        card.setValue(100);
+        card.setStatus(CardStatus.ACTIVATED);
+
+        when(cardRepository.findByCode(code)).thenReturn(Optional.of(card));
+
+        int remainingBalance = cardService.processCardPayment(new CardPaymentRequestDTO() {{
+            setCode(code);
+            setAmount(amount);
+        }});
+
+        assertEquals(50, remainingBalance);
+        verify(cardRepository).save(card);
+    }
+
+    @Test
+    void processCardPayment_ShouldThrow_WhenCardNotFound() {
+        String code = "CARD123";
+        int amount = 50;
+
+        when(cardRepository.findByCode(code)).thenReturn(Optional.empty());
+
+        Exception ex = assertThrows(IllegalArgumentException.class, () ->
+                cardService.processCardPayment(new CardPaymentRequestDTO() {{
+                    setCode(code);
+                    setAmount(amount);
+                }}));
+
+        assertEquals("Card not found", ex.getMessage());
+    }
+
+    @Test
+    void processCardPayment_ShouldThrow_WhenCardIsNotActivated() {
+        String code = "CARD123";
+        int amount = 50;
+
+        Card card = new Card();
+        card.setCode(code);
+        card.setValue(100);
+        card.setStatus(CardStatus.PENDING);
+
+        when(cardRepository.findByCode(code)).thenReturn(Optional.of(card));
+
+        Exception ex = assertThrows(IllegalStateException.class, () ->
+                cardService.processCardPayment(new CardPaymentRequestDTO() {{
+                    setCode(code);
+                    setAmount(amount);
+                }}));
+
+        assertEquals("Card is not activated", ex.getMessage());
+    }
+
+    @Test
+    void processCardPayment_ShouldThrow_WhenInsufficientBalance() {
+        String code = "CARD123";
+        int amount = 200;
+
+        Card card = new Card();
+        card.setCode(code);
+        card.setValue(100);
+        card.setStatus(CardStatus.ACTIVATED);
+
+        when(cardRepository.findByCode(code)).thenReturn(Optional.of(card));
+
+        Exception ex = assertThrows(IllegalStateException.class, () ->
+                cardService.processCardPayment(new CardPaymentRequestDTO() {{
+                    setCode(code);
+                    setAmount(amount);
+                }}));
+
+        assertEquals("Insufficient balance on the card", ex.getMessage());
+    }
+
+
+    @Test
+    void useCardsForPayment_ShouldSucceed_WhenSufficientBalance() {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CODE123"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(1L);
+        request.setOrderId("ORD001");
+
+        User agent = new User();
+        agent.setId(1L);
+
+        Card card = new Card();
+        card.setCode("CODE123");
+        card.setStatus(CardStatus.ACTIVATED);
+        card.setAssignedTo(agent);
+        card.setValue(100);
+
+        when(cardRepository.findByCodeIn(List.of("CODE123"))).thenReturn(List.of(card));
+        when(cardRepository.save(any(Card.class))).thenReturn(card);
+        when(transactionLogRepository.save(any(CardTransactionLog.class))).thenReturn(new CardTransactionLog());
+
+        CardPaymentResponseDTO response = cardService.useCardsForPayment(request);
+
+        assertEquals(50.0, response.getPaidAmount());
+        assertEquals(0.0, response.getRemainingAmount());
+        assertEquals("SUCCESS", response.getPaymentStatus());
+        assertEquals("Payment processed successfully.", response.getMessage());
+    }
+    @Test
+    void useCardsForPayment_ShouldFail_WhenCardNotActivated() {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CODE123"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(1L);
+
+        User agent = new User();
+        agent.setId(1L);
+
+        Card card = new Card();
+        card.setCode("CODE123");
+        card.setStatus(CardStatus.PENDING);
+        card.setAssignedTo(agent);
+        card.setValue(100);
+
+        when(cardRepository.findByCodeIn(List.of("CODE123"))).thenReturn(List.of(card));
+
+        Exception ex = assertThrows(IllegalStateException.class, () -> cardService.useCardsForPayment(request));
+        assertEquals("Card with code CODE123 is not activated.", ex.getMessage());
+    }
+
+    @Test
+    void useCardsForPayment_ShouldFail_WhenCardDoesNotBelongToAgent() {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CODE123"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(1L);
+
+        User otherAgent = new User();
+        otherAgent.setId(2L);
+
+        Card card = new Card();
+        card.setCode("CODE123");
+        card.setStatus(CardStatus.ACTIVATED);
+        card.setAssignedTo(otherAgent);
+        card.setValue(100);
+
+        when(cardRepository.findByCodeIn(List.of("CODE123"))).thenReturn(List.of(card));
+
+        Exception ex = assertThrows(SecurityException.class, () -> cardService.useCardsForPayment(request));
+        assertEquals("Access denied: card does not belong to this agent.", ex.getMessage());
+    }
+
+    @Test
+    void useCardsForPayment_ShouldFail_WhenNoCardsFound() {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("NON_EXISTENT"));
+        request.setPurchaseAmount(50.0);
+        request.setAgentId(1L);
+
+        when(cardRepository.findByCodeIn(List.of("NON_EXISTENT"))).thenReturn(List.of());
+
+        Exception ex = assertThrows(IllegalArgumentException.class, () -> cardService.useCardsForPayment(request));
+        assertEquals("No cards found for the provided codes.", ex.getMessage());
+    }
+
+    @Test
+    void useCardsForPayment_ShouldFail_WhenInsufficientBalance() {
+        CardUsageRequestDTO request = new CardUsageRequestDTO();
+        request.setCodes(List.of("CARD1"));
+        request.setPurchaseAmount(150.0);
+        request.setAgentId(1L);
+
+        User agent = new User();
+        agent.setId(1L);
+
+        Card card = new Card();
+        card.setCode("CARD1");
+        card.setStatus(CardStatus.ACTIVATED);
+        card.setAssignedTo(agent);
+        card.setValue(100);
+
+        when(cardRepository.findByCodeIn(List.of("CARD1"))).thenReturn(List.of(card));
+        when(cardRepository.save(any(Card.class))).thenReturn(card);
+        when(transactionLogRepository.save(any(CardTransactionLog.class))).thenReturn(new CardTransactionLog());
+
+        CardPaymentResponseDTO response = cardService.useCardsForPayment(request);
+
+        assertEquals(100.0, response.getPaidAmount());
+        assertEquals(50.0, response.getRemainingAmount());
+        assertEquals("FAILED", response.getPaymentStatus());
+        assertEquals("Insufficient balance. Please top up your cards.", response.getMessage());
+    }
+
+
+
 
 
     @Test
