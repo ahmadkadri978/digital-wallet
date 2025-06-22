@@ -620,7 +620,7 @@ public class CardServiceTest {
         card2.setId(2L);
         card2.setCode("CARD002");
         card2.setValue(200);
-        card2.setStatus(CardStatus.valueOf("USED"));
+        card2.setStatus(CardStatus.valueOf("ASSIGNED"));
 
 
         List<Card> cardEntities = List.of(card1, card2);
@@ -635,7 +635,7 @@ public class CardServiceTest {
         dto2.setId(2L);
         dto2.setCode("CARD002");
         dto2.setValue(200);
-        dto2.setStatus(CardStatus.valueOf("USED"));
+        dto2.setStatus(CardStatus.valueOf("ASSIGNED"));
 
         when(cardRepository.findAll()).thenReturn(cardEntities);
         when(cardMapper.toResponseDTO(card1)).thenReturn(dto1);
