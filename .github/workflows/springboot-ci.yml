@@ -1,5 +1,5 @@
 
-name: Spring Boot CI
+name: Spring Boot CI with MySQL
 
 on:
   push:
@@ -9,11 +9,24 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: 30stmars
+          MYSQL_DATABASE: digital_wallet
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
-      - name: Checkout the code
+      - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -22,6 +35,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build with Maven
-        run: mvn clean install -DskipTests=false
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in {1..30}; do
+            nc -z 127.0.0.1 3306 && echo "MySQL is up!" && break
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+      - name: Build and Test with Maven
+        run: mvn clean install
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/digital_wallet?allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 30stmars
+
 

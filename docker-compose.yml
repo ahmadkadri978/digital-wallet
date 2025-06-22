@@ -9,9 +9,41 @@ services:
       MYSQL_ROOT_PASSWORD: 30stmars
       MYSQL_DATABASE: digital_wallet
     ports:
-      - "3306:3306"
+      - "3307:3306"
+
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - digital_wallet_net
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: digital-wallet
+    container_name: springboot-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/digital_wallet?allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 30stmars
+    networks:
+      - digital_wallet_net
+
 
 volumes:
   mysql_data:
+
+networks:
+  digital_wallet_net:
+
